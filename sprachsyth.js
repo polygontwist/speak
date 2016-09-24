@@ -280,8 +280,7 @@ var spraSy=function(){
 		var idnr=0;
 		
 		var create=function(){
-			outputNode=cE(ziel,"div","log2","log");
-			outputNode.style.backgroundColor="#eee";
+			outputNode=cE(ziel,"div",undefined,"log2");
 			outputNode.onclick=function(){
 				_this.clear();
 			}
