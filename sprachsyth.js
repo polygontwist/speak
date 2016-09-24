@@ -223,23 +223,6 @@ var spraSy=function(){
 				klickButt(quelltextNode.value);				
 				return false;
 			}
-		//playbutton.style.display="none";
-		/*
-		htmlnode=cE(ziel,'br');
-		
-		htmlnode=cE(ziel,'a');
-		htmlnode.href="#";
-		htmlnode.innerHTML="start()";
-		htmlnode.className="button";
-		htmlnode.onclick=function(){		
-				output.write('...');
-				if(newAudibuffSaktiv!=undefined){
-					console.log(newAudibuffSaktiv);
-					newAudibuffSaktiv.start(0);			output.write('...start');
-					}	
-				return false;
-			}*/
-		//playbutton.style.display="none";
 		
 		htmlnode=cE(ziel,'br');
 		
@@ -249,7 +232,7 @@ var spraSy=function(){
 		audioQuelle.load(audioSRC);
 		
 		
-		//todo: generate audio
+		//todo: generate audiofile
 		/*media=cE(undefined,'audio');
 		media.controls="controls";
 		document.body.appendChild(media);
@@ -260,6 +243,7 @@ var spraSy=function(){
 		htmlnode=cE(ziel,'div',"log","log");
 		
 		output=new oDebug(ziel);
+		output.write("ready.");
 	}
 	
 	var createSLider=function(ziel,labeltext,min,max,step,value ){
@@ -291,14 +275,55 @@ var spraSy=function(){
 	
 	var oDebug=function(ziel){
 		var outputNode;
+		var zeilen=[];
+		var _this=this;
+		var idnr=0;
+		
 		var create=function(){
 			outputNode=cE(ziel,"div","log2","log");
 			outputNode.style.backgroundColor="#eee";
-			outputNode.innerHTML="ready."
+			outputNode.onclick=function(){
+				_this.clear();
+			}
+			
 		};
 		
-		this.write=function(s){
-			outputNode.innerHTML+='<br>'+s;
+		this.getNewID=function(){idnr++;return idnr;}
+		
+		this.clear=function(){
+			zeilen=[];
+			outputNode.innerHTML="";
+		}
+		
+		this.write=function(s,id){
+			var i,sout="",gefunden;
+			if(id==undefined){
+				if(s!=""){
+					idnr++;
+					zeilen.push( {"id":idnr,"txt":s}  )
+				}
+					
+			}else{
+				gefunden=false;
+				for(i=0;i<zeilen.length;i++){
+					if(zeilen[i].id==id){
+						zeilen[i].txt=s;
+						gefunden=true;
+						}						
+				}
+				if(!gefunden){
+					zeilen.push( {"id":id,"txt":s}  )
+				}
+			}
+			
+			for(i=0;i<zeilen.length;i++){
+				if(i>0)sout+="<br>";
+				sout+=zeilen[i].txt;
+			}
+			
+			outputNode.innerHTML=sout;
+			
+			return idnr;			
 		}
 		
 		create();
@@ -709,7 +734,7 @@ var spraSy=function(){
 		var newAudibuffS;
 	
 		this.createAudioData=function(playliste,zielmedia){
-			var i,plObj,t,qval,nowBuffering,cannels,
+			var i,plObj,t,qval,nowBuffering,cannels,outputzid,
 				sampelbegin,sampelend,sampellength,samoverlapp,
 				lastsampellength=0,
 				laenge=0,
@@ -766,26 +791,26 @@ var spraSy=function(){
 			//Asource.buffer = myArrayBuffer;
 			//Asource.connect(audioCtx.destination);
 			
+			outputzid=output.getNewID();
+			output.write(outputzid+" play...",outputzid);
+			
 			//generate Audio
 			newAudibuffS= audioCtx.createBufferSource();
 			newAudibuffS.buffer = myArrayBuffer;
 			newAudibuffS.connect(audioCtx.destination);
-			if(newAudibuffS.detune!=undefined)
+			if(newAudibuffS.detune!=undefined)//nicht auf iOS
 				newAudibuffS.detune.value = input_detune.value; //verstimmung/geschwindigkeit  -1200 to 1200
 			if(newAudibuffS.playbackRate!=undefined)
 				newAudibuffS.playbackRate.value =input_geschw.value; //= input_detune.value; //geschwindigkeit 1=normal
 			
+			newAudibuffS.outputzid=outputzid;
 			newAudibuffS.onended=function(){
-				//console.log("end",this);
-				output.write("fertig.");
+				output.write(outputzid+" fertig.",this.outputzid);
 				}
 				
 			newAudibuffSaktiv=newAudibuffS;		
-			newAudibuffS.start(0);//iOS ...
+			newAudibuffS.start(0);
 			
-			
-			
-			//newAudibuffS.noteOff(0);
 			
 			
 			//var blob = new Blob(newAudibuffS, { 'type' : 'audio/ogg; codecs=opus' });

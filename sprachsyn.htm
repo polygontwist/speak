@@ -21,11 +21,19 @@
 		font-family: Verdana,sans-serif;
 		font-size:16px;
 	}
-	#log{
+	.log{
 		font-family:monospace;
 		font-size:15px;
+		cursor:pointer;
+		position:relative;
 	}
-	#log p{margin:0;
+	.log:after{
+		content:"click to clear";
+		position:absolute;
+		right:0;
+		top:0;
+	}
+	.log p{margin:0;
 		padding:0;
 		margin-bottom:5px;}
 		
