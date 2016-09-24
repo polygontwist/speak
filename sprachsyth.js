@@ -3,7 +3,8 @@
 //Version 0.3 11.9.2016 23:15 von Andreas Kosmehl; basisversion
 //Version 0.4 18.9.2016 02:12 von Andreas Kosmehl; wortlistencheck(innerhalb worte), Ausgabe separiert
 //Version 0.5 19.9.2016 00:34 von Andreas Kosmehl; statt soundscrubbing, generiertes Audio
-//Version 0.6 19.9.2016 23:09 von Andreas Kosmehl; regler für Geschwindigkeit
+//Version 0.6 19.9.2016 23:09 von Andreas Kosmehl; Regler für Geschwindigkeit
+//Version 0.7 20.9.2016 23:59 von Andreas Kosmehl; unbekannte Zeichen überlesen, Nummern in Worte "3in1"
 
 /*
  Text zu lesen:
@@ -108,6 +109,7 @@ var spraSy=function(){
 	
 	
 	var wortliste=[	//phon wird im ini verknüpft
+		//{w:"drei",  oID:[1,6,28],phon:[] },  //'drei'
 		{w:"die",  oID:[1,11,43 ],phon:[] },  //'die'
 		{w:"ich",  oID:[11,30 ],phon:[] },  //'ich' s'ich'erlich
 		{w:"auch", oID:[23,40 ],phon:[] },  //'auch'
@@ -116,10 +118,12 @@ var spraSy=function(){
 		{w:"ss", oID:[4 ],phon:[] },		//wu'ss'ten
 		{w:"ist", oID:[11,4,1 ],phon:[] },	//'ist'
 		{w:"st", oID:[15,1 ],phon:[] },		//'st'uhl
-		{w:"pe", oID:[21,31 ],phon:[] },		//'pe'ter
-		{w:"ge", oID:[10,31 ],phon:[] },		//
-		//{w:"en", oID:[31,50 ],phon:[] },		//
-		{w:"re", oID:[6,31 ],phon:[] }		//'pe'ter
+		{w:"pe", oID:[21,31 ],phon:[] },	//'pe'ter 
+		{w:"ge", oID:[10,31 ],phon:[] },	//
+		//{w:"en", oID:[31,50 ],phon:[] },	//
+		{w:"rei", oID:[6,28 ],phon:[] }	,	//	frei, 3
+		//{w:"re", oID:[6,31 ],phon:[] }		//	-> kollidiert mit frei
+		{w:"---", oID:[],phon:[] }	
 	];
 	
 	
@@ -181,6 +185,11 @@ var spraSy=function(){
 		quelltextNode=cE(ziel,'input',"eingabetext");
 		quelltextNode.type="text";
 		quelltextNode.value="Hallo ich bin ein Computer";
+		quelltextNode.onkeyup=function(e){
+				if(e.keyCode==13){
+						klickButt(quelltextNode.value);	
+					}
+				}
 		
 		htmlnode=cE(ziel,'br');
 		htmlnode=cE(ziel,'br');
@@ -257,7 +266,7 @@ var spraSy=function(){
 	
 	var klickButt=function(sprichtext){
 		playlist=[];
-		generatePlaylist(sprichtext,false); //worte in phoneme konvertieren (playlist befüllen)
+		generatePlaylist(sprichtext); //worte in phoneme konvertieren (playlist befüllen)
 		
 		audioQuelle.createAudioData(playlist,media);
 		
@@ -326,7 +335,7 @@ var spraSy=function(){
 		return {status:undefined}; //keine Phonemkombination gefunden
 	}
 	
-	var generatePlaylist=function(wortorig,ohnepause){
+	var generatePlaylist=function(wortorig){
 		if(wortorig=="")return;
 		
 		var iphon,ilist,o,oph,p,i,s,re,itera,rere,
@@ -368,7 +377,8 @@ var spraSy=function(){
 			wort=wort.split('#0000ff').join('blau');
 			wort=wort.split('#ff00ff').join('lila');
 			
-		var workwort=wort;
+		var workwort=wort;	
+		
 		
 		//wenn Leerzeichen, jedes Wort getrennt behandeln
 		if(workwort.indexOf(' ')>-1){
@@ -376,11 +386,11 @@ var spraSy=function(){
 			re.orig="";
 			for(i=0;i<workwort.length;i++){
 				if(i>0)addPlaylist([oPause]);
-				generatePlaylist(workwort[i],false);
+				generatePlaylist(workwort[i]);
 			}
 			return;
 		}
-		
+
 		//zahlen bis 9999, TODO: zahlen in worte "1ter"
 		if(!isNaN(wort)){//'1234'		
 			var zahlen=wort.split('');//['1','2','3','4']
@@ -455,7 +465,7 @@ var spraSy=function(){
 				s+=arr[i];
 			}
 			
-			generatePlaylist(s,false);
+			generatePlaylist(s);
 			return;			
 		}
 		
@@ -467,13 +477,13 @@ var spraSy=function(){
 		if(o.status===false){
 			//status:false, wortpre:pre,wortmid:mid,wortrest:rest;
 			if(o.wortpre.length>0) 
-				generatePlaylist(o.wortpre,true);				
+				generatePlaylist(o.wortpre);				
 					
 			if(o.wortmid.length>0) 
-				generatePlaylist(o.wortmid,true);			
+				generatePlaylist(o.wortmid);			
 				
 			if(o.wortrest.length>0)
-				generatePlaylist(o.wortrest,true);
+				generatePlaylist(o.wortrest);
 							
 			return;
 		};
@@ -483,17 +493,19 @@ var spraSy=function(){
 			addPlaylist(o.liste);
 			return;
 		}
-		
 		if(o.status===undefined){//status:undefined
 			itera=wort.length * phoneDE.length;//while nicht ins endlose laufen lassen
 			//Wort in Phoneme konvertieren (Buchstabenkombination in Tabelle "phoneDE" finden)	
+			
+			
 			while(wort.length>0){
 				gefunden=false;
+				//console.log(workwort,wort,!isNaN(workwort));	
 				for(ilist=0;ilist<phoneDE.length;ilist++){
 					o=phoneDE[ilist];//hole ein phonemsatz
 					for(iphon=0;iphon<o.k.length;iphon++){//gucke alle definierten zeichen durch
 						oph=o.k[iphon];
-						if(workwort==oph){//console.log('!',workwort);
+						if(workwort==oph){
 							workwort=workwort.slice(oph.length);
 							gefunden=true;
 							wortout.push(o);
@@ -508,11 +520,27 @@ var spraSy=function(){
 					if(gefunden){break;}//else{console.log('#',oph);}
 				}
 				
+				
 				if(workwort.length==0)break;
 				
 				if(!gefunden){
 					workwort=workwort.slice(0,workwort.length-1);//letzten buchstaben wegnehmen, neuer durchlauf
 					//console.log('>',workwort,workwort.length);
+				}
+				if(!isNaN(workwort)){
+					if(wortout.length>0){
+						addPlaylist(wortout);
+						wortout=[];
+					}
+					generatePlaylist(workwort);
+					
+					p=workwort.length;
+					if(p<1)p=1;//Buchstabe/zeichen nicht gefunden, überlesen
+					
+					wort=wort.slice(p);
+					workwort="";
+					generatePlaylist(wort);
+					break;
 				}
 				
 				itera--;
@@ -520,9 +548,7 @@ var spraSy=function(){
 						console.log("		break",workwort);
 						break;
 						}
-			
 			}
-			
 			//zur Playlist hinzufügen
 			addPlaylist(wortout);	//console.log("ADD",wortout);			
 		}
