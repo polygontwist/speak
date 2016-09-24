@@ -5,6 +5,7 @@
 //Version 0.5 19.9.2016 00:34 von Andreas Kosmehl; statt soundscrubbing, generiertes Audio
 //Version 0.6 19.9.2016 23:09 von Andreas Kosmehl; Regler für Geschwindigkeit
 //Version 0.7 20.9.2016 23:59 von Andreas Kosmehl; unbekannte Zeichen überlesen, Nummern in Worte "3in1"
+//Version 0.8 20.9.2016 23:59 von Andreas Kosmehl; Sampel überlappung; iOS
 
 /*
  Text zu lesen:
@@ -127,27 +128,32 @@ var spraSy=function(){
 	];
 	
 	
+	var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 	var media;
 	var quelltextNode;
 	var input_detune;
 	var input_geschw;
+	var input_overlap;
+	var debug;
 	var playbutton;
+	var output;
 	
 	var audioQuelle;
 	
 	//--------basics-------
-	var cE=function(ziel,e,id){
-		var newE=document.createElement(e);
-		if(id!="" && id!=undefined)newE.id=id;
-		if(ziel!=undefined)ziel.appendChild(newE);
-		return newE;
+	var cE=function(ziel,e,id,cn){
+		var newNode=document.createElement(e);
+		if(id!=undefined && id!="")newNode.id=id;
+		if(cn!=undefined && cn!="")newNode.className=cn;
+		if(ziel)ziel.appendChild(newNode);
+		return newNode;
 		}
 
 	var gE=function(id){if(id=="")return undefined; else return document.getElementById(id);}
 	
 	
 	var playlist=[];//of phoneme
-	
+	var newAudibuffSaktiv=undefined;
 	
 	//--------sytem-------
 	
@@ -193,13 +199,18 @@ var spraSy=function(){
 		
 		htmlnode=cE(ziel,'br');
 		htmlnode=cE(ziel,'br');
-		
-		input_detune=htmlnode=createSLider(ziel,'detune:',-1200,1200,50 ,0);
-		
-		htmlnode=cE(ziel,'br');
-		
-		htmlnode=cE(ziel,'br');
-		input_geschw=htmlnode=createSLider(ziel,'playbackrate:',0.5,2,0.1 ,1);
+
+		var newAudibuffS= audioCtx.createBufferSource();
+		if(newAudibuffS.detune!=undefined){
+			input_detune=htmlnode=createSLider(ziel,'detune:',-1200,1200,50 ,0);
+			htmlnode=cE(ziel,'br');
+		}
+		if(newAudibuffS.playbackRate!=undefined){
+			input_geschw=htmlnode=createSLider(ziel,'playbackrate:',0.5,2,0.1 ,1);
+			htmlnode=cE(ziel,'br');
+		}
+				
+		input_overlap=htmlnode=createSLider(ziel,'overlap:',0,1,0.1 ,0.3);
 				
 		
 		htmlnode=cE(ziel,'br');
@@ -212,6 +223,22 @@ var spraSy=function(){
 				klickButt(quelltextNode.value);				
 				return false;
 			}
+		//playbutton.style.display="none";
+		/*
+		htmlnode=cE(ziel,'br');
+		
+		htmlnode=cE(ziel,'a');
+		htmlnode.href="#";
+		htmlnode.innerHTML="start()";
+		htmlnode.className="button";
+		htmlnode.onclick=function(){		
+				output.write('...');
+				if(newAudibuffSaktiv!=undefined){
+					console.log(newAudibuffSaktiv);
+					newAudibuffSaktiv.start(0);			output.write('...start');
+					}	
+				return false;
+			}*/
 		//playbutton.style.display="none";
 		
 		htmlnode=cE(ziel,'br');
@@ -230,9 +257,9 @@ var spraSy=function(){
 		*/
 		
 		
+		htmlnode=cE(ziel,'div',"log","log");
 		
-		htmlnode=cE(ziel,'div',"log");
-		
+		output=new oDebug(ziel);
 	}
 	
 	var createSLider=function(ziel,labeltext,min,max,step,value ){
@@ -262,7 +289,20 @@ var spraSy=function(){
 		return input;
 	}
 	
-	
+	var oDebug=function(ziel){
+		var outputNode;
+		var create=function(){
+			outputNode=cE(ziel,"div","log2","log");
+			outputNode.style.backgroundColor="#eee";
+			outputNode.innerHTML="ready."
+		};
+		
+		this.write=function(s){
+			outputNode.innerHTML+='<br>'+s;
+		}
+		
+		create();
+	}
 	
 	var klickButt=function(sprichtext){
 		playlist=[];
@@ -558,7 +598,6 @@ var spraSy=function(){
 	var ObjaudioQuelle=function(){
 		var request= new XMLHttpRequest();
 			request.responseType = 'arraybuffer';
-		var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 		var source;		//chan = source.buffer.getChannelData(0);
 		
 		var sampelsready=false;
@@ -663,14 +702,19 @@ var spraSy=function(){
 			//console.log(source);
 			
 			playbutton.innerHTML="play";
+			
+			output.write("Sampels geladen.");
 		}
 		
 		var newAudibuffS;
 	
 		this.createAudioData=function(playliste,zielmedia){
-			var i,plObj,sampelbegin,sampelend,t;
+			var i,plObj,t,qval,nowBuffering,cannels,
+				sampelbegin,sampelend,sampellength,samoverlapp,
+				lastsampellength=0,
+				laenge=0,
+				nez=0;					//position im zielbuffer
 			
-			var laenge=0;
 			for(i=0;i<playliste.length;i++){
 				plObj=playliste[i];
 				sampelbegin		=(plObj.a);//sec -> sampl   
@@ -678,26 +722,41 @@ var spraSy=function(){
 				laenge+=sampelend-sampelbegin;		
 			};
 			
-			var sectosam=source.buffer.duration/source.buffer.length;//source.buffer.sampleRate;//44100
-			var nez=0;
+			var sectosam=source.buffer.duration/source.buffer.length;//Divisor: Sec to sampel
 			var channels = 1;//mono
-			var frameCount = source.buffer.sampleRate * (laenge+1);//in sec
+			var frameCount = source.buffer.sampleRate * (laenge+1);//Länge in sec
+			
+			//create new Buffer
 			var myArrayBuffer = audioCtx.createBuffer(channels, frameCount, source.buffer.sampleRate);
-			var nowBuffering = myArrayBuffer.getChannelData(0);
-			var cannels;
+			
+			//Quelle
 			var chan= source.buffer.getChannelData(0);	//nur aus einem Kanal Daten holen (mono)
 			
-			for(cannels=0;cannels<channels;cannels++){
-				nowBuffering = myArrayBuffer.getChannelData(cannels);		
+			var overlapp=0.3;//0..1 (1=100%)
+			if(input_overlap!=undefined)overlapp=input_overlap.value;
+			
+			for(cannels=0;cannels<channels;cannels++){//jeder Channel befüllen
+				nowBuffering = myArrayBuffer.getChannelData(cannels);	//zielBuffer
 				nez=0;
 				for(i=0;i<playliste.length;i++){
 					plObj=playliste[i];
 					sampelbegin		=parseInt(plObj.a/sectosam);//sec -> sampl   
 					sampelend		=parseInt(plObj.e/sectosam);
+					sampellength	=sampelend-sampelbegin;
+					
+					samoverlapp=parseInt(lastsampellength*overlapp);//überlappungsposition im letzten Sampel					
+					nez-=samoverlapp;
+					if(nez<0)nez=0;
+					
+	
 					for(t=sampelbegin;t<sampelend;t++){
-						nowBuffering[nez]=chan[t];		//sampels umkopieren
+						qval=nowBuffering[nez]+chan[t];
+						if(qval>1)qval=1;
+						if(qval<-1)qval=-1;
+						nowBuffering[nez]=qval;		//sampels umkopieren
 						nez++;					
-					};				
+					};	
+					lastsampellength=sampellength;
 				};
 			};
 			
@@ -707,16 +766,27 @@ var spraSy=function(){
 			//Asource.buffer = myArrayBuffer;
 			//Asource.connect(audioCtx.destination);
 			
-			
 			//generate Audio
 			newAudibuffS= audioCtx.createBufferSource();
 			newAudibuffS.buffer = myArrayBuffer;
 			newAudibuffS.connect(audioCtx.destination);
-			newAudibuffS.detune.value = input_detune.value; //verstimmung/geschwindigkeit  -1200 to 1200
-			newAudibuffS.playbackRate.value =input_geschw.value; //= input_detune.value; //geschwindigkeit 1=normal
+			if(newAudibuffS.detune!=undefined)
+				newAudibuffS.detune.value = input_detune.value; //verstimmung/geschwindigkeit  -1200 to 1200
+			if(newAudibuffS.playbackRate!=undefined)
+				newAudibuffS.playbackRate.value =input_geschw.value; //= input_detune.value; //geschwindigkeit 1=normal
 			
-			newAudibuffS.start();//iOS ...
+			newAudibuffS.onended=function(){
+				//console.log("end",this);
+				output.write("fertig.");
+				}
+				
+			newAudibuffSaktiv=newAudibuffS;		
+			newAudibuffS.start(0);//iOS ...
+			
+			
+			
 			//newAudibuffS.noteOff(0);
+			
 			
 			//var blob = new Blob(newAudibuffS, { 'type' : 'audio/ogg; codecs=opus' });
 			//zielmedia.src= URL.createObjectURL(newAudibuffS);
