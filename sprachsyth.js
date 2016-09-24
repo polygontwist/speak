@@ -2,7 +2,8 @@
 
 //Version 0.3 11.9.2016 23:15 von Andreas Kosmehl; basisversion
 //Version 0.4 18.9.2016 02:12 von Andreas Kosmehl; wortlistencheck(innerhalb worte), Ausgabe separiert
-//
+//Version 0.5 19.9.2016 00:34 von Andreas Kosmehl; statt soundscrubbing, generiertes Audio
+//Version 0.6 19.9.2016 23:09 von Andreas Kosmehl; regler für Geschwindigkeit
 
 /*
  Text zu lesen:
@@ -26,6 +27,7 @@
  Die *Synode der *Familie besteht.
  In der *Reihe steht ein *Beamter wie jeder andere auch.
  
+ Tagesschau
 */
 /*
 	todo: -generate audiofile
@@ -36,8 +38,8 @@ var spraSy=function(){
 	//https://de.wiktionary.org/wiki/Verzeichnis:Deutsch/Phoneme_und_Grapheme
 	
 	var audioSRC="phoneme.mp3";
-	var timekorrekturA=-0.02;//.02+0.04;
-	var timekorrekturE=+0.04;
+	var timekorrekturA=-0.00;//.02+0.04;
+	var timekorrekturE=+0.00;
 	//nach Häufigkeit:
 	var phoneDE=[
 		{id:1,t:"t",k:"t,d,tt,th,dt" ,a:1,e:1.16 },
@@ -115,12 +117,16 @@ var spraSy=function(){
 		{w:"ist", oID:[11,4,1 ],phon:[] },	//'ist'
 		{w:"st", oID:[15,1 ],phon:[] },		//'st'uhl
 		{w:"pe", oID:[21,31 ],phon:[] },		//'pe'ter
+		{w:"ge", oID:[10,31 ],phon:[] },		//
+		//{w:"en", oID:[31,50 ],phon:[] },		//
 		{w:"re", oID:[6,31 ],phon:[] }		//'pe'ter
 	];
 	
 	
 	var media;
 	var quelltextNode;
+	var input_detune;
+	var input_geschw;
 	var playbutton;
 	
 	var audioQuelle;
@@ -136,20 +142,7 @@ var spraSy=function(){
 	var gE=function(id){if(id=="")return undefined; else return document.getElementById(id);}
 	
 	
-	var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-	var cancelAnimationFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame;
 	var playlist=[];//of phoneme
-	
-	var audioTimer={
-		aktiv:false,
-		timer:undefined,
-		isplaying:false,
-		start:0,
-		stopp:0,
-		mediaready:false,
-		
-		playlistposition:0
-	};
 	
 	
 	//--------sytem-------
@@ -187,7 +180,18 @@ var spraSy=function(){
 		
 		quelltextNode=cE(ziel,'input',"eingabetext");
 		quelltextNode.type="text";
-		quelltextNode.value="";
+		quelltextNode.value="Hallo ich bin ein Computer";
+		
+		htmlnode=cE(ziel,'br');
+		htmlnode=cE(ziel,'br');
+		
+		input_detune=htmlnode=createSLider(ziel,'detune:',-1200,1200,50 ,0);
+		
+		htmlnode=cE(ziel,'br');
+		
+		htmlnode=cE(ziel,'br');
+		input_geschw=htmlnode=createSLider(ziel,'playbackrate:',0.5,2,0.1 ,1);
+				
 		
 		htmlnode=cE(ziel,'br');
 		
@@ -199,7 +203,7 @@ var spraSy=function(){
 				klickButt(quelltextNode.value);				
 				return false;
 			}
-		playbutton.style.display="none";
+		//playbutton.style.display="none";
 		
 		htmlnode=cE(ziel,'br');
 		
@@ -210,18 +214,11 @@ var spraSy=function(){
 		
 		
 		//todo: generate audio
-		media=cE(undefined,'audio');
+		/*media=cE(undefined,'audio');
 		media.controls="controls";
 		document.body.appendChild(media);
-		media.addEventListener('canplay', MediaCanPlay, false);	//"canplaythrough"		
-		media.addEventListener('ended', MediaEnded, false);			
-		media.addEventListener('play', MediaPlay, false);			
-		media.addEventListener('pause', MediaPause, false);			
-		media.addEventListener('timeupdate', MediaTimeupdate, false);			
-		
-		media.src=audioSRC;
-		media.load();
-		
+		media.style.display="none";
+		*/
 		
 		
 		
@@ -229,15 +226,40 @@ var spraSy=function(){
 		
 	}
 	
+	var createSLider=function(ziel,labeltext,min,max,step,value ){
+		
+		var htmlnode=cE(ziel,'label');
+		htmlnode.innerHTML=labeltext;
+		htmlnode.className="reglerlabel";
+		
+		var input=cE(ziel,'input');
+		input.className="regler";
+		input.type="range";
+		input.min=min;
+		input.max=max;
+		input.step=step;
+		input.value=value;
+		
+		input.onchange=function(){
+			this.valueview.innerHTML=this.value;
+		}
+		
+		var htmlnode=cE(ziel,'label');
+		htmlnode.innerHTML=input.value;
+		htmlnode.className="reglervalue";
+		
+		input.valueview=htmlnode;
+		
+		return input;
+	}
+	
+	
+	
 	var klickButt=function(sprichtext){
-		audioTimer.playlistposition=0; 
-
 		playlist=[];
 		generatePlaylist(sprichtext,false); //worte in phoneme konvertieren (playlist befüllen)
 		
-		audioQuelle.createAudioData(playlist);
-		
-		//playPlaylist(); //playlist abspielen
+		audioQuelle.createAudioData(playlist,media);
 		
 		outputtext(sprichtext);//von Playlist ableiten
 
@@ -525,14 +547,16 @@ var spraSy=function(){
 		
 		//Request
 		request.onreadystatechange =function(){
-					console.log("onreadystatechange",this.readyState);
+					//console.log("onreadystatechange",this.readyState);
 					if(this.readyState==4){
-						console.log("getData 4");//geladen
+						//console.log("getData 4");//geladen
 					}
 		};
 		
 		request.onload = function() {
-			console.log("**");
+			//console.log("**");
+			playbutton.innerHTML="play*";
+			
 			var audioData = request.response;
 			audioCtx.decodeAudioData(audioData,
 								decodeAudioData, 
@@ -558,7 +582,7 @@ var spraSy=function(){
 							0,0,0,0,0,0,0,0,0,0
 							];
 			//console.log(70/buffer.sampleRate);//0.0015873015873015873sec
-			console.log(buffer);
+			//console.log(buffer);
 			var lastXBuffpos=0;
 			var anz0=0;
 			var anzBloecke=0;
@@ -591,11 +615,11 @@ var spraSy=function(){
 							cutL=(Bend-Abeginn);
 							if(cutL>0.01){
 								//gefundene Blöcke mit Liste abgleich
-								/**/
+								/*
 								console.log(anzBloecke,
 									phoneDE[anzBloecke].a,Abeginn,
 									phoneDE[anzBloecke].e,Bend
-								);								
+								);	*/							
 								
 								if(phoneDE[anzBloecke].a>Abeginn)phoneDE[anzBloecke].a=Abeginn;
 								if(phoneDE[anzBloecke].e<Bend)phoneDE[anzBloecke].e=Bend;								
@@ -610,63 +634,90 @@ var spraSy=function(){
 			sampelsready=true;
 			//console.log(1,'=',buffer.duration/buffer.length,'sec',buffer);
 			//console.log(buffer.length/buffer.sampleRate);//=buffer.duration
-			console.log(source);
+			//console.log(source);
+			
+			playbutton.innerHTML="play";
 		}
 		
+		var newAudibuffS;
 	
-	
-		this.createAudioData=function(playliste){
+		this.createAudioData=function(playliste,zielmedia){
 			var i,plObj,sampelbegin,sampelend,t;
-			var newAudiData=[];//sampels hintereinander
-			var chan= source.buffer.getChannelData(0);
-			var sectosam=source.buffer.duration/source.buffer.length;//source.buffer.sampleRate;//44100
 			
+			var laenge=0;
 			for(i=0;i<playliste.length;i++){
 				plObj=playliste[i];
-				sampelbegin		=parseInt(plObj.a/sectosam);//sec -> sampl   
-				sampelend		=parseInt(plObj.e/sectosam);
-				for(t=sampelbegin;t<sampelend;t++){
-					newAudiData.push(chan[t]);
-				};				
+				sampelbegin		=(plObj.a);//sec -> sampl   
+				sampelend		=(plObj.e);
+				laenge+=sampelend-sampelbegin;		
 			};
+			
+			var sectosam=source.buffer.duration/source.buffer.length;//source.buffer.sampleRate;//44100
+			var nez=0;
+			var channels = 1;//mono
+			var frameCount = source.buffer.sampleRate * (laenge+1);//in sec
+			var myArrayBuffer = audioCtx.createBuffer(channels, frameCount, source.buffer.sampleRate);
+			var nowBuffering = myArrayBuffer.getChannelData(0);
+			var cannels;
+			var chan= source.buffer.getChannelData(0);	//nur aus einem Kanal Daten holen (mono)
+			
+			for(cannels=0;cannels<channels;cannels++){
+				nowBuffering = myArrayBuffer.getChannelData(cannels);		
+				nez=0;
+				for(i=0;i<playliste.length;i++){
+					plObj=playliste[i];
+					sampelbegin		=parseInt(plObj.a/sectosam);//sec -> sampl   
+					sampelend		=parseInt(plObj.e/sectosam);
+					for(t=sampelbegin;t<sampelend;t++){
+						nowBuffering[nez]=chan[t];		//sampels umkopieren
+						nez++;					
+					};				
+				};
+			};
+			
 			//console.log(newAudiData.length);
 			
-			//generate Audio
+			//var Asource = audioCtx.createMediaElementSource(zielmedia);
+			//Asource.buffer = myArrayBuffer;
+			//Asource.connect(audioCtx.destination);
 			
+			
+			//generate Audio
+			newAudibuffS= audioCtx.createBufferSource();
+			newAudibuffS.buffer = myArrayBuffer;
+			newAudibuffS.connect(audioCtx.destination);
+			newAudibuffS.detune.value = input_detune.value; //verstimmung/geschwindigkeit  -1200 to 1200
+			newAudibuffS.playbackRate.value =input_geschw.value; //= input_detune.value; //geschwindigkeit 1=normal
+			
+			newAudibuffS.start();//iOS ...
+			//newAudibuffS.noteOff(0);
+			
+			//var blob = new Blob(newAudibuffS, { 'type' : 'audio/ogg; codecs=opus' });
+			//zielmedia.src= URL.createObjectURL(newAudibuffS);
+			
+			//var m = audioCtx.createMediaStreamDestination();
+			//m.buffer = myArrayBuffer;
+			//zielmedia.src = URL.createObjectURL(myArrayBuffer.buffer);
+			
+			
+			//zielmedia
+			/**/
+			
+			/*var analyser = audioCtx.createAnalyser();
+			Asource.connect(analyser);
+			analyser.connect(audioCtx.destination);*/
+			
+			/*Asource.connect(newAudibuffS);
+			newAudibuffS.connect(audioCtx.destination);*/
+			//Asource.connect(newAudibuffS);
+			//Asource.context=newAudibuffS.context;
+			//console.log("B",Asource);
 			
 		}
 	
 	}
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	//--Audio-Events--
-	var MediaCanPlay	=function(){
-		if(audioTimer.mediaready==false){
-			media.play();
-			audioTimer.mediaready=true;
-			
-			console.log("audio geladen");
-			//media.style.display="none"; //iOS!
-			}
-		}
-	var MediaEnded		=function(){}		
-	var MediaPlay		=function(){
-			if(media.style.display!="none"){
-				media.pause();
-				playbutton.style.display="inline-block";
-				//media.style.display="none";
-			}
-		}
-	var MediaPause		=function(){}
-	var MediaTimeupdate =function(){}
 	
 	//-----------------
 	var addPlaylist=function(liste){
@@ -674,71 +725,6 @@ var spraSy=function(){
 		for(i=0;i<liste.length;i++){
 			playlist.push(liste[i]);
 		}	
-	}
-	
-	var playPlaylist=function(){
-		startAudioTimer();
-	}
-	
-	
-	var startAudioTimer=function(){
-		if(audioTimer.aktiv==false){
-			audioTimer.aktiv=true;	console.log("startAudioTimer");
-			
-			if(requestAnimationFrame){
-				audioTimer.timer=requestAnimationFrame(audiotimer_animate);//ca. 60fps
-				}
-				else{
-				audioTimer.timer=window.setInterval(function(){audiotimer_Interval()}, 1000/animator.playframerate);//25fps
-				}
-			
-			
-		}
-	}
-	
-	
-	var audiotimer_animate=function(){//requestAnimationFrame
-		  if(audioTimer.aktiv){
-			audiotimer_Interval();
-			if(audioTimer.timer!=undefined)audioTimer.timer = requestAnimationFrame(audiotimer_animate);
-		  }
-	}
-	
-	var audiotimer_Interval=function(){//Interval
-		var i,Mediapos;
-		if(audioTimer.mediaready && media!=undefined && media.currentTime!=undefined){
-		
-			//hole ersten Eintrag aus Liste
-			if(playlist.length>0 && audioTimer.isplaying==false){
-				
-				if(audioTimer.playlistposition>=playlist.length){return;}
-				
-				var phonem=playlist[audioTimer.playlistposition];
-				//console.log(phonem);
-				audioTimer.start=phonem.a+timekorrekturA;
-				if(audioTimer.start<0)audioTimer.start=0;
-				audioTimer.stopp=phonem.e+timekorrekturE;
-				
-				if(phonem.e-phonem.a>0){
-					//Abspielen starten
-					media.currentTime=audioTimer.start;
-					media.play();
-					audioTimer.isplaying=true;
-				}
-				//Zeiger auf nächstes Element setzen
-				audioTimer.playlistposition++;
-			}
-			
-			Mediapos=media.currentTime;//sec
-			if(audioTimer.isplaying && Mediapos!=undefined){
-				if(audioTimer.stopp<Mediapos){	//Ende erreicht?
-					media.pause();
-					audioTimer.isplaying=false;
-				}				
-			}
-			
-			
-		}
 	}
 	
 	
