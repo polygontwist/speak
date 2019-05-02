@@ -681,6 +681,7 @@ var spraSy=function(){
 			
 			//Anfang und Ende der Sampels checken
 			//und ggf. korrigieren
+			/*
 			for(i=0;i<chan.length;i++){
 				data=chan[i];// -1..0..+1
 				
@@ -704,11 +705,6 @@ var spraSy=function(){
 							cutL=(Bend-Abeginn);
 							if(cutL>0.01){
 								//gefundene Blöcke mit Liste abgleich
-								/*
-								console.log(anzBloecke,
-									phoneDE[anzBloecke].a,Abeginn,
-									phoneDE[anzBloecke].e,Bend
-								);	*/							
 								
 								if(phoneDE[anzBloecke].a>Abeginn)phoneDE[anzBloecke].a=Abeginn;
 								if(phoneDE[anzBloecke].e<Bend)phoneDE[anzBloecke].e=Bend;								
@@ -720,6 +716,7 @@ var spraSy=function(){
 					lastXBuffpos=0;
 				}				
 			}
+			*/
 			sampelsready=true;
 			//console.log(1,'=',buffer.duration/buffer.length,'sec',buffer);
 			//console.log(buffer.length/buffer.sampleRate);//=buffer.duration
